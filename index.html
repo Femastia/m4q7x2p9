@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta name="referrer" content="no-referrer">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="●">
+<meta name="theme-color" content="#63bd68">
+<title>●</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235da85f'/%3E%3Ccircle cx='32' cy='32' r='10' fill='%23eaf7c8'/%3E%3C/svg%3E">
+<style>
+:root{--dot:#b5e97a;--on:#f0ffc4;--line:#e4ffa6;--panel:rgba(86,140,52,.78)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:linear-gradient(118deg,#a9f05c 0%,#8fe05e 18%,#6fc864 36%,#5dbb6c 52%,#5dbb6c 100%) fixed;display:flex;flex-direction:column;align-items:center;padding:0 16px calc(env(safe-area-inset-bottom,0px) + 28px);min-height:100dvh;overflow:hidden}
+#top{flex:1 1 auto;width:100%}
+#pad{flex:0 0 auto;width:min(92vw,380px);aspect-ratio:1;background:var(--panel);border-radius:26px;box-shadow:0 8px 24px rgba(40,90,30,.25);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+</style>
+</head>
+<body>
+<div id="top"></div>
+<canvas id="pad" width="640" height="640"></canvas>
+<script>
+const cv=document.getElementById('pad'),ctx=cv.getContext('2d');
+const S=640,R=34,HIT=60;
+const pos=i=>({x:S*(1/6+(i%3)/3),y:S*(1/6+Math.floor(i/3)/3)});
+let used=[],finger=null,drawing=false,lastSend=0;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+function between(a,b){
+  const r1=Math.floor(a/3),c1=a%3,r2=Math.floor(b/3),c2=b%3;
+  if((r1+r2)%2||(c1+c2)%2)return null;
+  return ((r1+r2)/2)*3+(c1+c2)/2;
+}
+function addDot(n){
+  if(used.includes(n))return;
+  const last=used[used.length-1];
+  if(last!==undefined){
+    const m=between(last,n);
+    if(m!==null&&!used.includes(m))used.push(m);
+  }
+  used.push(n);
+}
+function draw(){
+  ctx.clearRect(0,0,S,S);
+  if(used.length){
+    ctx.strokeStyle=css('--line');ctx.lineWidth=10;ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=.7;
+    ctx.beginPath();
+    used.forEach((d,i)=>{const p=pos(d);i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y)});
+    if(finger&&drawing)ctx.lineTo(finger.x,finger.y);
+    ctx.stroke();ctx.globalAlpha=1;
+  }
+  for(let i=0;i<9;i++){
+    const p=pos(i),on=used.includes(i);
+    ctx.beginPath();ctx.arc(p.x,p.y,on?R*.7:R*.45,0,Math.PI*2);
+    ctx.fillStyle=on?css('--on'):css('--dot');ctx.fill();
+    if(on){ctx.beginPath();ctx.arc(p.x,p.y,R,0,Math.PI*2);ctx.strokeStyle=css('--on');ctx.lineWidth=3;ctx.stroke()}
+  }
+}
+function pt(e){const r=cv.getBoundingClientRect();return{x:(e.clientX-r.left)*S/r.width,y:(e.clientY-r.top)*S/r.height}}
+function hit(p){for(let i=0;i<9;i++){const c=pos(i);if(Math.hypot(p.x-c.x,p.y-c.y)<HIT)return i}return -1}
+function move(e){
+  if(!drawing)return;
+  finger=pt(e);const h=hit(finger);
+  if(h>=0)addDot(h);
+  draw();
+}
+cv.addEventListener('pointerdown',e=>{
+  cv.setPointerCapture(e.pointerId);
+  used=[];drawing=true;move(e);
+});
+cv.addEventListener('pointermove',move);
+function end(){
+  if(!drawing)return;
+  drawing=false;finger=null;draw();
+  if(used.length<4){setTimeout(()=>{used=[];draw()},250);return}
+  const now=Date.now();
+  if(now-lastSend<500)return;
+  lastSend=now;
+  const code=used.map(d=>d+1).join('');
+  const url='shortcuts://run-shortcut?name='+encodeURIComponent('passAction')+'&input=text&text='+encodeURIComponent(code);
+  location.assign(url);
+}
+cv.addEventListener('pointerup',end);
+cv.addEventListener('pointercancel',end);
+draw();
+</script>
+</body>
+</html>
